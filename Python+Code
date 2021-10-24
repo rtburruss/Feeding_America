@@ -1,0 +1,247 @@
+import pandas as pd
+import numpy as np
+import pickle
+
+
+# Pickle Boolean Switches
+b1stRunA = False
+b1stRunB = False
+
+
+# Loading File
+filePath = '/Users/rtburruss/Desktop/FeedingAmerica.csv'
+data = pd.read_csv(filePath)                                    # store as pandas dataframe
+
+
+# Splitting Dataframe
+just_ingredients = data.iloc[:,5:62]                            # df of just ingredients 
+rest = data.iloc[:,0:5]                                         # df of everything else
+
+
+# Computing Number of Entries Per Axis Element
+ing_per_col = just_ingredients.count(axis = 0)
+ing_per_row = just_ingredients.count(axis = 1)
+
+print(min(ing_per_row), max(ing_per_row))
+
+
+def collectTerms(dataFrame):
+    """creates list of all discrete elements in dataframe""" 
+        
+    terms = []                                                  # initialize list of elements
+    
+    for i in range(len(dataFrame)):
+        for j in range(len(dataFrame.columns)):
+            
+            current = str(dataFrame.iloc[i,j])                  # obtain current element
+            
+            if current not in terms:                            # if element is new...
+                terms.append(current)                           # add to elements list
+    
+    return terms
+
+            
+# Pickle the Long-Running Ingredients File
+if b1stRunA == True:
+    
+    ingredients = collectTerms(just_ingredients)                    # run method and store
+    ingredients.sort()                                              # alphabetizes list
+    ingredients.remove('nan')                                       # remove 'nan' from list
+    
+    pickle.dump(ingredients, open('ingredients', 'wb'))
+    
+else: 
+    ingredients = pickle.load(open('ingredients', 'rb'))
+
+    
+# List of Bad Ingredients
+bad_ingredients = ['butter', 'crisco', 'margarine', 'lard', 'fat', 'suet', 'tallow', 'pork', 'beef', 'lamb', 'poultry', 'duck', 'chicken', 'goose', 'sausage', 'salami', 'chorizo', 'pancetta', 'bacon', 'ham', 'cheese', 'milk', 'chocolate', 'spaghetti', 'tortilla', 'cream', 'sugar', 'syrup', 'salt', 'soy', 'flour', 'rice', 'potato', 'mayonnaise', 'white rice', 'white bread', 'white flour']
+initial_values = np.zeros(len(bad_ingredients))
+
+
+def scoreRecipe(recipe, bad_ingredients):
+    """Gives a Single Recipe a Bad Ingredients Count Array, Total Score, and % Bad Ingredients"""
+    
+    scoreArray = np.zeros(len(bad_ingredients), dtype = int)        # initialize scoreArray
+    multiArray = []                                                 # initialize multiples count
+    
+    for i in range(len(recipe)):                                    # looping through ingredients   
+    
+        if str(recipe[i]) == 'nan':                                 # stopping if NaN
+            break
+            
+        else: 
+            multiArray = np.append(multiArray, 0)                   # append slot for new ingredient
+            
+            for j in range(len(bad_ingredients)):                   # looping through bad ingredients       
+                
+                if bad_ingredients[j] in recipe[i]:                 # looking for bad ingred presence
+                    scoreArray[j] += 1                              # and adding to bad ingred score
+                    multiArray[i] += 1                              # tick instance per ingredient
+                    
+    score = int(sum(scoreArray))
+    
+    hasMulti = 0                                                    # initialize has multiples boolean
+    nonMultiArray = multiArray                                      # copy of multiArray
+    
+    for i in range(len(multiArray)):
+        if multiArray[i] > 1:
+            hasMulti = 1
+            nonMultiArray[i] = 1
+    
+    ingred_score = int(sum(nonMultiArray))
+    total_ingred = len(nonMultiArray)
+    
+    return scoreArray, score, ingred_score, total_ingred, hasMulti 
+
+
+
+def scoreMatrix(just_ingredients, bad_ingredients):
+    """Gives a Full Bad Ingredients Matrix for All Recipes"""
+    
+    rows = len(just_ingredients)
+    cols = len(bad_ingredients)
+    
+    scoreMatrix = np.zeros((rows, cols + 4), dtype = int)
+    
+    for i in range(rows):
+        recipe = just_ingredients.iloc[i]
+        array, badSum, ingredScore, totalIngred, hasMulti = scoreRecipe(recipe, bad_ingredients)
+        
+        array = np.append(array, [badSum, ingredScore, totalIngred, hasMulti])       
+        
+        scoreMatrix[i,:] = array
+            
+    return scoreMatrix
+
+
+# Pickle the Long-Running Ingredients File
+if b1stRunB == True:
+    
+    scoreMatrix = scoreMatrix(just_ingredients, bad_ingredients)
+    
+    pickle.dump(scoreMatrix, open('scoreMatrix', 'wb'))
+    
+else: 
+    scoreMatrix = pickle.load(open('scoreMatrix', 'rb'))
+    
+
+# Reformatting as a DataFrame and Combining with Rest DataFrame
+bad_ingredients += ['overall score', 'bad ingredients', 'total ingredients', 'has multiples']
+scoreMatrix = pd.DataFrame(scoreMatrix)
+scoreMatrix.columns = bad_ingredients
+results = pd.concat([rest, scoreMatrix], axis = 1)
+
+
+# Relabeling Ethnic Groups (currently only works for non-split ingredients)
+
+data = [['pole and italian', 2, ['polish', 'italian']],
+        ['english and german', 2, ['english', 'german']],
+        ['roumanian and turkis', 2, ['roumanian', 'turkish']],
+        ['spanish, mexiccan', 2, ['spanish', 'mexican']],
+        ['jwish', 1, ['jewish']],
+        ['polish, slavic', 2, ['polish', 'slavic']],
+        ['armenian, syrian, turkish, greek', 4, ['armenian', 'syrian', 'turkish', 'greek']],
+        ['norwegian and swedish', 2, ['norwegian', 'swedish']],
+        ['frnch', 1, ['french']],
+        ['portugaise', 1, ['portuguese']],
+        ['german-jewish', 1, ['jewish']],
+        ['armenian, persian, turkish, greek', 4, ['armenian', 'persian', 'turkish', 'greek']],  
+        ['germany and german', 1, ['german']],
+        ['pole and polish', 1, ['polish']],
+        ['french and france', 1, ['french']],
+        ['portuguese and portugal', 1, ['portuguese']],
+        ['slovenian, slavic', 1, ['slavic']],
+        ['spanish and portuguese', 2, ['spanish', 'portuguese']],
+        ['spanish/mexican', 2, ['spanish', 'mexican']],
+        ['french and austrian', 2, ['french', 'austrian']],
+        ['hamburg', 1, ['german']],
+        ['french and german', 2, ['french', 'german']],
+        ['turkish and greek', 2, ['turkish', 'greek']],
+        ['greek and turkish', 2, ['turkish', 'greek']], 
+        ['american, english', 2, ['american', 'english']],
+        ['londoner', 1, ['english']],
+        ['sicilian', 1, ['italian']],
+        ['parisian', 1, ['french']],
+        ['venetian', 1, ['italian']],
+        ['bavarian', 1, ['german']],
+        ['berlin', 1, ['german']],
+        ['boulogne', 1, ['french']],
+        ['britanny', 1, ['french']],
+        ['milanese', 1, ['italian']],
+        ['vienna', 1, ['austrian']],
+        ['genevan', 1, ['swiss']],
+        ['flanders', 1, ['belgian']],
+        ['genoese', 1, ['italian']],
+        ['mirabeau', 1, ['french']],
+        ['montpellier', 1, ['french']],
+        ['neapolitan', 1, ['italian']],
+        ['norman', 1, ['french']],
+        ['rouen', 1, ['french']],
+        ['oiental', 1, ['oriental']],
+        ['russia', 1, ['russian']],
+        ['saxony', 1, ['german']],
+        ['saxon', 1, ['german']],
+        ['scotch', 1, ['scottish']],
+        ['tyrolian', 1, ['tyrolean']],
+        ['suabian', 1, ['german']],
+        ]
+
+changes = pd.DataFrame(data, columns = ['input', 'split', 'output'])
+
+# results = results.iloc[0:5572,:]
+
+
+for i in range(len(results)):                                           # cycles through df rows
+    
+    for j in range(len(changes)):                                       # cycles through changes rows
+        
+        if results.loc[i, 'ethnicgroup'] == changes.loc[j,'input']:     # if tags match
+            iSplit = changes.loc[j,'split']                             # number of splits
+            vOutput = changes.loc[j,'output']                           # changed tag vector
+            copyRow = results.loc[i,:].copy()                           # make copy of original df row
+            
+            if iSplit == 1:
+                results.loc[i, 'ethnicgroup'] = vOutput[0]
+            
+            # for k in range(0,iSplit):                                   # cycles through splits
+            #     if k == 0:                                              # for first entry only
+            #         results.loc[i, 'ethnicgroup'] = vOutput[k]          # replace tag
+                    
+                # elif k > 0:                                             # for higher splits
+                #     oldLength = len(results)
+                    
+                #     newLength = len(results)
+                    
+                #     print(oldLength, newLength)
+                    # newRow = copyRow                                    # temporary version of old row
+                    # newRow.loc['ethnicgroup'] = vOutput[k]              # replace tag
+                    
+
+                    
+# Saving Everything to CSV Format
+results.to_csv("feeding-america-scores.csv")
+
+    
+# Currently Unused Function
+def convertRowToBinary(row, columns):
+    """converts list to binary array based on column header elements"""
+    
+    array = [0] * len(columns)                              # initialize binary array
+    row = [x for x in row if x == x]                        # remove all 'nan' values
+    
+    for i in range(len(row)):
+        
+        current = str(row[i])                               # obtain current element of list
+        index = columns.index(current)                      # find index in columns for current element
+        array[index] = 1                                    # change that index from 0 to 1
+    
+    return array
+    
+
+# row0 = convertRowToBinary(data.iloc[0,:], ingredients)
+# print(row0)
+
+
+
+
